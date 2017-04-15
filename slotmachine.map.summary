@@ -1,0 +1,16 @@
+Analysis & Synthesis Status : Successful - Sat Apr 15 10:59:37 2017
+Quartus Prime Version : 16.1.0 Build 196 10/24/2016 SJ Lite Edition
+Revision Name : slotmachine
+Top-level Entity Name : slotmachine
+Family : MAX 10
+Total logic elements : 212
+    Total combinational functions : 200
+    Dedicated logic registers : 120
+Total registers : 120
+Total pins : 28
+Total virtual pins : 0
+Total memory bits : 0
+Embedded Multiplier 9-bit elements : 0
+Total PLLs : 0
+UFM blocks : 0
+ADC blocks : 0

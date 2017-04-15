@@ -50,49 +50,54 @@ module slotmachine(
 	//////////// SW //////////
 	input 		     [0:0]		SW;
 
-//=======================================================
-//  REG/WIRE declarations
-//=======================================================
-
-wire			start;
-wire			stop;
-wire			clk;
-wire			reset;
-wire [6:0] 	oSEG0;
-wire [6:0]	oSEG1;
-wire [6:0]	oSEG2;
-
-wire [3:0]	lfsr_in0;
-wire [3:0]	lfsr_in1;
-wire [3:0]	lfsr_in2;
-
-wire [3:0]	out0;
-wire [3:0]	out1;
-wire [3:0]	out2;
-
-wire		enable0;
-wire		enable1;
-wire		enable2;
 
 
 //=======================================================
 //  PARAMETER Definition
 //=======================================================
 
-defparam slot_inst.pIdle 		= 'b00;
-defparam slot_inst.pRunning 	= 'b01;
-defparam slot_inst.pStopping 	= 'b10;
-defparam slot_inst.clk_val 	= 'b100110001001011010000000;
-defparam slot_inst.stop_val0 	= 'b00000101111101011110000100000000;
-defparam slot_inst.stop_val1 	= 'b00001011111010111100001000000000;
-defparam slot_inst.stop_val2 	= 'b00010001111000011010001100000000;
+parameter lfsr_length = 10;
 
-defparam lfsr_inst0.and_val 	= 'b1100;
-defparam lfsr_inst0.reset_val = 'b0001;
-defparam lfsr_inst1.and_val 	= 'b1100;
-defparam lfsr_inst1.reset_val = 'b0010;
-defparam lfsr_inst2.and_val 	= 'b1100;
-defparam lfsr_inst2.reset_val = 'b0100;
+defparam slot_inst.IDLE = 'b00;
+defparam slot_inst.RUNNING = 'b01;
+defparam slot_inst.STOPPING = 'b10;
+defparam slot_inst.MUX_ADDR0 = 'b00;
+defparam slot_inst.MUX_ADDR1 = 'b01;
+defparam slot_inst.MUX_ADDR2 = 'b10;
+defparam slot_inst.clk_val = 'b100110001001011010000000;
+defparam slot_inst.debounce_max = 'b00000000010011000100101101000000;
+defparam slot_inst.stop_val0 = 'b00000101111101011110000100000000;
+defparam slot_inst.stop_val1 = 'b00001011111010111100001000000000;
+defparam slot_inst.stop_val2 = 'b00010001111000011010001100000000;
+defparam slot_inst.lfsr_length = lfsr_length;
+
+defparam lfsr_inst.lfsr_length = lfsr_length;
+
+
+//=======================================================
+//  REG/WIRE declarations
+//=======================================================
+wire								start;
+wire								stop;
+wire								clk;
+wire								reset;
+wire [6:0] 						oSEG0;
+wire [6:0]						oSEG1;
+wire [6:0]						oSEG2;
+
+wire [lfsr_length-1 : 0]	lfsr_out;
+
+wire [3:0]						slot_out0;
+wire [3:0]						slot_out1;
+wire [3:0]						slot_out2;
+
+wire								enable;
+
+wire								rst_out;
+
+reg								rst_ff0;
+reg								rst_ff1;
+reg								rst_ff2;	
 
 //=======================================================
 //  Structural coding
@@ -112,66 +117,57 @@ assign	HEX1[7] = 'b1;
 assign	HEX2[7] = 'b1;
 
 //=======================================================
+//  Reset Synchronisation
+//=======================================================
+
+always @ (posedge clk)
+begin: RESET_SYNCH
+	rst_ff0 <= reset;
+	rst_ff1 <= rst_ff0;
+	rst_ff2 <= rst_ff1 && rst_ff0;
+end
+
+assign	rst_out = rst_ff2;
+
+//=======================================================
 //	Instanciation of different cores
 //=======================================================
 
 slot slot_inst
 (
-	.start(start) ,			// input  start_sig
-	.stop(stop) ,				// input  stop_sig
-	.clk(clk) ,					// input  clk_sig
-	.reset(reset) ,			// input  reset_sig
-	.lfsr_in0(lfsr_in0) ,	// input [3:0] lfsr_in0_sig
-	.lfsr_in1(lfsr_in1) ,	// input [3:0] lfsr_in1_sig
-	.lfsr_in2(lfsr_in2) ,	// input [3:0] lfsr_in2_sig
-	.enable0(enable0) ,		// output  enable0_sig
-	.enable1(enable1) ,		// output  enable1_sig
-	.enable2(enable2) ,		// output  enable2_sig
-	.out0(out0) ,				// output [3:0] out0_sig
-	.out1(out1) ,				// output [3:0] out1_sig
-	.out2(out2) 				// output [3:0] out2_sig
+	.start(start) ,	// input  start_sig
+	.stop(stop) ,	// input  stop_sig
+	.clk(clk) ,	// input  clk_sig
+	.reset(rst_out) ,	// input  reset_sig
+	.lfsr_in(lfsr_out) ,	// input [lfsr_length-1:0] lfsr_in_sig
+	.slot_out0(slot_out0) ,	// output [3:0] slot_out0_sig
+	.slot_out1(slot_out1) ,	// output [3:0] slot_out1_sig
+	.slot_out2(slot_out2) 	// output [3:0] slot_out2_sig
 );
 
-lfsr lfsr_inst0
+lfsr lfsr_inst
 (
-	.clk(clk) ,					// input  clk_sig
-	.reset(reset) ,			// input  reset_sig
-	.enable(enable0) ,		// input  enable_sig
-	.lfsr_out(lfsr_in0) 		// output [3:0] lfsr_out_sig
-);
-
-lfsr lfsr_inst1
-(
-	.clk(clk) ,				// input  clk_sig
-	.reset(reset) ,			// input  reset_sig
-	.enable(enable1) ,		// input  enable_sig
-	.lfsr_out(lfsr_in1) 	// output [3:0] lfsr_out_sig
-);
-
-lfsr lfsr_inst2
-(
-	.clk(clk) ,				// input  clk_sig
-	.reset(reset) ,			// input  reset_sig
-	.enable(enable2) ,		// input  enable_sig
-	.lfsr_out(lfsr_in2) 	// output [3:0] lfsr_out_sig
+	.clk(clk) ,	// input  clk_sig
+	.reset(rst_out) ,	// input  reset_sig
+	.lfsr_out(lfsr_out) 	// output [lfsr_length-1:0] lfsr_out_sig
 );
 
 SEG7_LUT SEG7_LUT_inst0
 (
 	.oSEG(oSEG0) ,	// output [6:0] oSEG_sig
-	.iDIG(out2) 	// input [3:0] iDIG_sig
+	.iDIG(slot_out2) 	// input [3:0] iDIG_sig
 );
 
 SEG7_LUT SEG7_LUT_inst1
 (
 	.oSEG(oSEG1) ,	// output [6:0] oSEG_sig
-	.iDIG(out1) 	// input [3:0] iDIG_sig
+	.iDIG(slot_out1) 	// input [3:0] iDIG_sig
 );
 
 SEG7_LUT SEG7_LUT_inst2
 (
 	.oSEG(oSEG2) ,	// output [6:0] oSEG_sig
-	.iDIG(out0) 	// input [3:0] iDIG_sig
+	.iDIG(slot_out0) 	// input [3:0] iDIG_sig
 );
 
 endmodule

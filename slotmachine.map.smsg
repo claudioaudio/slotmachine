@@ -1,0 +1,7 @@
+Info (10281): Verilog HDL Declaration information at slot.v(20): object "RUNNING" differs only in case from object "running" in the same scope File: C:/Users/Claudius/Documents/modelsim/verilog/slotmachine/slot.v Line: 20
+Info (10281): Verilog HDL Declaration information at slot.v(21): object "STOPPING" differs only in case from object "stopping" in the same scope File: C:/Users/Claudius/Documents/modelsim/verilog/slotmachine/slot.v Line: 21
+Info (10281): Verilog HDL Declaration information at slot.v(45): object "slot_out0" differs only in case from object "SLOT_OUT0" in the same scope File: C:/Users/Claudius/Documents/modelsim/verilog/slotmachine/slot.v Line: 45
+Info (10281): Verilog HDL Declaration information at slot.v(46): object "slot_out1" differs only in case from object "SLOT_OUT1" in the same scope File: C:/Users/Claudius/Documents/modelsim/verilog/slotmachine/slot.v Line: 46
+Info (10281): Verilog HDL Declaration information at slot.v(47): object "slot_out2" differs only in case from object "SLOT_OUT2" in the same scope File: C:/Users/Claudius/Documents/modelsim/verilog/slotmachine/slot.v Line: 47
+Info (10281): Verilog HDL Declaration information at slot.v(67): object "stop_cnt" differs only in case from object "STOP_CNT" in the same scope File: C:/Users/Claudius/Documents/modelsim/verilog/slotmachine/slot.v Line: 67
+Info (10281): Verilog HDL Declaration information at slot.v(65): object "debounce" differs only in case from object "DEBOUNCE" in the same scope File: C:/Users/Claudius/Documents/modelsim/verilog/slotmachine/slot.v Line: 65

@@ -2,52 +2,65 @@
 Description: This Verilog-Code describes the Main-Core of
 the Slotmachine. He contains a statemachine, an clock-
 counter, a debounce function and a output	
+
 *********************************************************/
 module slot(
 start,
 stop,
 clk,
 reset,
-lfsr_in0,
-lfsr_in1,
-lfsr_in2,
-enable0,
-enable1,
-enable2,
-out0,
-out1,
-out2
+lfsr_in,
+slot_out0,
+slot_out1,
+slot_out2
 );
+
+//Define internal parameters
+parameter IDLE			= 2'b00;
+parameter RUNNING		= 2'b01;
+parameter STOPPING		= 2'b10;
+
+parameter MUX_ADDR0		= 2'b00;
+parameter MUX_ADDR1		= 2'b01;
+parameter MUX_ADDR2		= 2'b10;
+
+parameter clk_val		= 24'h989680;
+
+parameter debounce_max	= 32'h004C4B40;
+
+parameter stop_val0		= 32'h05F5E100;
+parameter stop_val1		= 32'h0BEBC200;
+parameter stop_val2		= 32'h11E1A300;
+
+parameter lfsr_length = 10;
+
 //Declare Input Ports
 input start;
 input stop;
 input clk;
 input reset;
-input [3:0] lfsr_in0;
-input [3:0] lfsr_in1;
-input [3:0] lfsr_in2;
+input [lfsr_length-1 : 0] lfsr_in;
 
 //Declare Output Ports
-output [3:0] out0;
-output [3:0] out1;
-output [3:0] out2;
-output enable0;
-output enable1;
-output enable2;
+output [3:0] slot_out0;
+output [3:0] slot_out1;
+output [3:0] slot_out2;
 
+//Declare internal registers
+reg [3:0] slot_out0 = 0; 
+reg [3:0] slot_out1 = 0; 
+reg [3:0] slot_out2 = 0;
 
-//Declare internal variables
-reg [3:0] out0 = 4'b0000; 
-reg [3:0] out1 = 4'b0000; 
-reg [3:0] out2 = 4'b0000;
+reg [1:0] state 	= IDLE; 
 
-reg [1:0] state, next_state;
+reg [1:0] mux_sel 	= MUX_ADDR0;
+
+reg running;
+reg stopping;
 
 reg start_flag;
 
 reg stop_flag;
-
-reg finish_flag;
 
 reg [31:0] debounce;
 
@@ -55,19 +68,39 @@ reg [31:0] stop_cnt;
 
 reg [23:0] clk_cnt;
 
-reg enable0, enable1, enable2;
 
-//Define internal parameters
 
-parameter pIdle			= 2'b00;
-parameter pRunning		= 2'b01;
-parameter pStopping		= 2'b10;
+//Declare internal wires
 
-parameter clk_val		= 24'h989680;
 
-parameter stop_val0		= 32'h05F5E100;
-parameter stop_val1		= 32'h0BEBC200;
-parameter stop_val2		= 32'h11E1A300;
+wire clk_flag;
+
+wire clk_cond;
+
+wire slot_cond0;
+wire slot_cond1;
+wire slot_cond2;
+
+wire mux_cond0;
+wire mux_cond1;
+wire mux_cond2;
+
+wire finish_flag0;
+wire finish_flag1;
+wire finish_flag2;
+
+//Structural Coding
+
+assign clk_flag = (clk_cnt == clk_val) ? 1'b1 : 1'b0;
+assign clk_cond = (clk_flag & (running | stopping));
+assign mux_cond0 = (~finish_flag0 & clk_cond);
+assign mux_cond1 = (~finish_flag1 & clk_cond);
+assign mux_cond2 = (~finish_flag2 & clk_cond);
+assign finish_flag0 = (stop_cnt > stop_val0) ? 1'b1 : 1'b0;
+assign finish_flag1 = (stop_cnt > stop_val1) ? 1'b1 : 1'b0;
+assign finish_flag2 = (stop_cnt > stop_val2) ? 1'b1 : 1'b0;
+
+//Sequential Coding
 
 always @ (posedge clk or negedge reset)
 begin: CLK_COUNT
@@ -83,78 +116,84 @@ begin: CLK_COUNT
 end
 //State machine with three states
 always @ (posedge clk or negedge reset)
-begin: STATE_MACHINE
-	state <= pIdle;
+begin: MAIN_STATE_MACHINE
 	if (reset == 0) begin
-		state <= pIdle;
+		state <= IDLE;
+		running <= 1'b0;		
+		stopping <= 1'b0;
 	end
 	else begin
-	state <= next_state;
 		case (state)
-			pIdle:		next_state <= (start_flag == 1) ? pRunning 	: pIdle;
-			pRunning:	next_state <= (stop_flag == 1) 	? pStopping : pRunning;
-			pStopping:  next_state <= (finish_flag == 1)? pIdle 	: pStopping;
+			IDLE	:	if (start_flag == 1) begin
+							state 		<= RUNNING;
+							running 	<= 1'b1;
+						end else begin
+							state 		<= IDLE;
+						end
+			RUNNING	:	if (stop_flag == 1) begin
+							state 		<= STOPPING;
+							running 	<= 1'b0;
+							stopping 	<= 1'b1;
+						end else begin
+							state 		<= RUNNING;
+						end
+			STOPPING:  	if (finish_flag2 == 1) begin
+							state 		<= IDLE;
+							stopping 	<= 1'b0;
+						end else begin
+							state 		<= STOPPING;
+						end
 		endcase
 	end
 end
 
 always @ (posedge clk or negedge reset)
-begin: OUT0
-	out0 <= 0;
-	if (reset == 0) begin
-		out0 <= 0;
+begin: MUX_STATE_MACHINE0
+	if(reset == 0) begin
+		mux_sel <= MUX_ADDR0;
 	end
-	else if (clk_cnt == clk_val) begin
-		out0[2:0] <= lfsr_in0[2:0];
-		out0[3] <= 1'b0;
-	end
-end
-
-always @ (posedge clk or negedge reset)
-begin: OUT1
-	out1 <= 0;
-	if (reset == 0) begin
-		out1 <= 0;
-	end
-	else if (clk_cnt == clk_val) begin
-		out1[2:0] <= lfsr_in1[2:0];
-		out1[3] <= 1'b0;
+	else begin
+		case (mux_sel) 
+			MUX_ADDR0 	: 	if (clk_cond == 1) mux_sel <= MUX_ADDR1;
+								else mux_sel <=  MUX_ADDR0;
+			MUX_ADDR1	: 	if (clk_cond == 1) mux_sel <= MUX_ADDR2; 
+								else mux_sel <=  MUX_ADDR1;
+			MUX_ADDR2 	: 	if (clk_cond == 1) mux_sel <= MUX_ADDR0; 
+								else mux_sel <=  MUX_ADDR2;
+		endcase
 	end
 end
 
-always @ (posedge clk or negedge reset)
-begin: OUT2
-	out2 <= 0;
-	if (reset == 0) begin
-		out2 <= 0;
-	end
-	else if (clk_cnt == clk_val) begin
-		out2[2:0] <= lfsr_in2[2:0];
-		out2[3] <= 1'b0;
+always @ (posedge clk)
+begin: SLOT_OUT0
+	if (mux_cond0 == 1) begin
+		case (mux_sel)
+			MUX_ADDR0	: slot_out0 <= {1'b0, lfsr_in[2:0]};
+			MUX_ADDR1	: slot_out0 <= {1'b0, lfsr_in[5:3]};
+			MUX_ADDR2	: slot_out0 <= {1'b0, lfsr_in[8:6]};
+		endcase
 	end
 end
-//Stop Process of the slots
-always @ (posedge clk or negedge reset)
-begin: ENABLE
-	enable0 <= 0;
-	enable1 <= 0;
-	enable2 <= 0;
-	if (reset == 0) begin
-		enable0 <= 0;
-		enable1 <= 0;
-		enable2 <= 0;
+
+always @ (posedge clk)
+begin: SLOT_OUT1
+	if (mux_cond1 == 1) begin
+		case (mux_sel)
+			MUX_ADDR1	: slot_out1 <= {1'b0, lfsr_in[2:0]};
+			MUX_ADDR2	: slot_out1 <= {1'b0, lfsr_in[5:3]};
+			MUX_ADDR0	: slot_out1 <= {1'b0, lfsr_in[8:6]};
+		endcase
 	end
-	else if(state == pRunning) begin
-		finish_flag <= 0;
-		enable0 <= 1;
-		enable1 <= 1;
-		enable2 <= 1;
-	end
-	else if(state == pStopping) begin
-		enable0 <= (stop_cnt > stop_val0) 		? 1'b0 : 1'b1;
-		enable1 <= (stop_cnt > stop_val1) 		? 1'b0 : 1'b1;
-		enable2 <= (stop_cnt > stop_val2) 		? 1'b0 : 1'b1;
-		finish_flag <= (stop_cnt > stop_val2) 	? 1'b1 : 1'b0;	
+end
+
+always @ (posedge clk)
+begin: SLOT_OUT2
+	if (mux_cond2 == 1) begin
+		case (mux_sel)
+			MUX_ADDR2	: slot_out2 <= {1'b0, lfsr_in[2:0]};
+			MUX_ADDR0	: slot_out2 <= {1'b0, lfsr_in[5:3]};
+			MUX_ADDR1	: slot_out2 <= {1'b0, lfsr_in[8:6]};
+		endcase
 	end
 end
 
@@ -163,7 +202,7 @@ begin: STOP_CNT
 	if (reset == 0 ) begin
 		stop_cnt <= 10'b0000000000;
 	end
-	else if (state == pStopping) begin
+	else if (stopping == 1) begin
 		stop_cnt <= stop_cnt +1'b1;
 	end
 	else begin 
@@ -176,10 +215,10 @@ begin: DEBOUNCE
 	if (reset == 0) begin
 		debounce <= 32'h00000000;
 	end
-	else if (debounce == 32'h004C4B40) begin
-		start_flag <= (start == 0) ? 1 : 0;
-		stop_flag <= (stop == 0) ? 1: 0;
+	else if (debounce == debounce_max) begin
 		debounce <= 32'h00000000;
+		start_flag <= (start == 0) ? 1'b1 : 1'b0;
+		stop_flag <= (stop == 0) ? 1'b1 : 1'b0;
 	end
 	else begin 
 		debounce <= debounce + 1'b1;
